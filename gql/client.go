@@ -9,6 +9,8 @@ import (
 
 	gogql "github.com/hasura/go-graphql-client"
 	untyped "github.com/shahidhk/gql"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 const (
@@ -155,6 +157,7 @@ func HeadersFor(actor *Actor, adminSecret, clientName string) map[string]string 
 // * From the actor information and admin secret provided in ActorAwareClient initialization
 // * Previously set in the context object
 func buildClient(headers map[string]string) *http.Client {
+	propagators := otel.GetTextMapPropagator()
 	return &http.Client{
 		Transport: headerRoundTripper{
 			setHeaders: func(req *http.Request) {
@@ -166,6 +169,8 @@ func buildClient(headers map[string]string) *http.Client {
 				for hn, hv := range GetHeadersFromContext(req.Context()) {
 					req.Header.Set(hn, hv)
 				}
+				// inject trace headers from context
+				propagators.Inject(req.Context(), propagation.HeaderCarrier(req.Header))
 			},
 			rt: http.DefaultTransport},
 	}
